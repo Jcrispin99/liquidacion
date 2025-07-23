@@ -40,10 +40,12 @@ try:
         f_ingreso = fila['Fec. Ing.']
         f_cese = fila['Fecha Cese']
         salario = fila['Basico']
-        #sacar el promedio gratificacion año pasado hoja['K24'] = 520
-        #dividir esa gratificacion en 6   hoja['P24'] = 520/6
-        #computable = basico +  hoja['P24'] = 520/6 
+        computable = salario + (520 / 6)#referencial
 
+        salario_antiguo = 1100
+        gratificacion_antiguo = 550
+        promedio_gratificacion = gratificacion_antiguo/6
+        computable_antiguo = salario_antiguo + promedio_gratificacion
 
         hoja['J16'] = nombre_persona          
         hoja['J17'] = "DNI N°: " + codigo
@@ -53,9 +55,24 @@ try:
         hoja['J21'] = "EXTINCIÓN O LIQUIDACIÓN DEL EMPLEADOR"
         hoja['J22'] = f"del {f_ingreso} al {f_cese}"
         hoja['K23'] = salario
+
         hoja['K24'] = 520
         hoja['P24'] = 520/6
-        hoja['K25'] = salario + 520/6
+        hoja['K25'] = computable
+
+        hoja['J93'] = nombre_persona          
+        hoja['J94'] = "DNI N°: " + codigo
+        hoja['J95'] = cargo
+        hoja['J96'] = f_ingreso
+        hoja['J97'] = f_cese
+        hoja['J98'] = "EXTINCIÓN O LIQUIDACIÓN DEL EMPLEADOR"
+        hoja['J99'] = f"del {f_ingreso} al {f_cese}"
+        hoja['K100'] = salario_antiguo
+        hoja['K101'] = gratificacion_antiguo
+        hoja['K102'] = computable_antiguo
+        hoja['P101'] = promedio_gratificacion
+        hoja['K95'] = computable_antiguo
+
 
         # --- CÁLCULO DE CTS ---
         # Verificar si la fecha de ingreso es válida
@@ -76,15 +93,37 @@ try:
             columna_excel = 'AE'
             
             fila_actual = fila_inicial
+            tramo_numero = 1
+            
             for reporte in historial_cts:
-                # Celda para los meses
-                hoja[f'{columna_excel}{fila_actual}'] = reporte['meses_computables']
+                # --- CÁLCULOS Y TEXTOS ---
+                # Función auxiliar para escribir en celda si no está combinada
+                def escribir_celda_segura(celda_ref, valor):
+                    try:
+                        if not isinstance(hoja[celda_ref], openpyxl.cell.MergedCell):
+                            hoja[celda_ref] = valor
+                    except:
+                        pass  # Ignorar si hay error al escribir
                 
-                # Celda para los días (una fila debajo)
-                hoja[f'{columna_excel}{fila_actual + 1}'] = reporte['dias_computables']
+                # D105: Texto descriptivo del tramo
+                escribir_celda_segura(f'D{fila_actual}', f"Por Meses Completos: {tramo_numero} mer Tramo")
+                
+                # D106: Representación textual de la operación (mitad del computable / 12)
+                mitad_computable = computable_antiguo / 2
+                escribir_celda_segura(f'D{fila_actual + 1}', f"{int(mitad_computable)} / 12")
+                
+                # H106: Resultado numérico de mitad del computable / 12
+                escribir_celda_segura(f'H{fila_actual + 1}', mitad_computable / 12)
+                
+                # J106: Cantidad de meses + "meses"
+                escribir_celda_segura(f'J{fila_actual + 1}', f"{reporte['meses_computables']} meses")
+                
+                # S106: (mitad del computable / 12) * cantidad de meses
+                escribir_celda_segura(f'S{fila_actual + 1}', (mitad_computable / 12) * reporte['meses_computables'])
                 
                 # Avanzamos 3 filas para el siguiente período (1 para días + 2 de espacio)
                 fila_actual += 3
+                tramo_numero += 1
 
         nombre_archivo_salida = f"Liquidacion_{nombre_persona.replace(' ', '_')}.xlsx"
         ruta_completa_salida = os.path.join(ruta_salida, nombre_archivo_salida)
