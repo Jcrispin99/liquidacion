@@ -119,10 +119,37 @@ try:
                 escribir_celda_segura(f'J{fila_actual + 1}', f"{reporte['meses_computables']} meses")
                 
                 # S106: (mitad del computable / 12) * cantidad de meses
-                escribir_celda_segura(f'S{fila_actual + 1}', (mitad_computable / 12) * reporte['meses_computables'])
+                resultado_meses = (mitad_computable / 12) * reporte['meses_computables']
+                escribir_celda_segura(f'S{fila_actual + 1}', resultado_meses)
                 
-                # Avanzamos 3 filas para el siguiente período (1 para días + 2 de espacio)
-                fila_actual += 3
+                # --- CÁLCULOS PARA DÍAS ---
+                # D107: Texto descriptivo para días
+                escribir_celda_segura(f'D{fila_actual + 2}', "Por Días")
+                
+                # D108: Representación textual de la operación para días (mitad del computable / 12 / 30)
+                escribir_celda_segura(f'D{fila_actual + 3}', f"{round(mitad_computable/12, 1)} / 30")
+                
+                # H108: Resultado numérico de (mitad del computable / 12) / 30
+                escribir_celda_segura(f'H{fila_actual + 3}', (mitad_computable / 12) / 30)
+                
+                # J108: Cantidad de días
+                escribir_celda_segura(f'J{fila_actual + 3}', f"{reporte['dias_computables']} días")
+                
+                # S108: Resultado de la operación por la cantidad de días
+                resultado_dias = ((mitad_computable / 12) / 30) * reporte['dias_computables']
+                escribir_celda_segura(f'S{fila_actual + 3}', resultado_dias)
+                
+                # S109: Sumatoria de S106 (meses) + S108 (días)
+                total_periodo = resultado_meses + resultado_dias
+                escribir_celda_segura(f'S{fila_actual + 4}', total_periodo)
+                
+                # Textos descriptivos en columna M
+                escribir_celda_segura(f'M{fila_actual + 4}', "TOTAL CTS")
+                escribir_celda_segura(f'M{fila_actual + 5}', "INTERES LABORAL")
+                escribir_celda_segura(f'M{fila_actual + 6}', "Total CTS, Interes Laboral")
+                
+                # Avanzamos 6 filas para el siguiente período (4 filas usadas + 2 de espacio)
+                fila_actual += 6
                 tramo_numero += 1
 
         nombre_archivo_salida = f"Liquidacion_{nombre_persona.replace(' ', '_')}.xlsx"
