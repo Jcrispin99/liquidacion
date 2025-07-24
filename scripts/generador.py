@@ -85,15 +85,18 @@ try:
             # Convertir fecha de ingreso a objeto date
             fecha_ingreso_trabajador = pd.to_datetime(f_ingreso, dayfirst=True).date()
             
-            # Definir hasta qué fecha se calculará la CTS (ajustado para incluir trabajadores de 2025)
-            fecha_calculo_cts = date(2025, 10, 31)
+            # Definir hasta qué fecha se calculará la CTS
+            # Usar fecha de cese si existe, sino usar 2025.04.30 como predeterminada
+            if pd.isna(f_cese):
+                fecha_calculo_cts = date(2025, 4, 30)
+            else:
+                fecha_calculo_cts = pd.to_datetime(f_cese, dayfirst=True).date()
 
             # Obtener el historial de períodos CTS
             historial_cts = generar_y_calcular_periodos_cts(fecha_ingreso_trabajador, fecha_calculo_cts)
 
             # Escribir los datos de CTS a partir de la celda AE105
             fila_inicial = 105
-            columna_excel = 'AE'
             
             fila_actual = fila_inicial
             tramo_numero = 1
@@ -122,6 +125,10 @@ try:
                 
                 # J106: Cantidad de meses + "meses"
                 escribir_celda_segura(f'J{fila_actual + 1}', f"{reporte['meses_computables']} meses")
+                
+                # L106: Período del tramo CTS (rangos de fechas)
+                periodo_texto = reporte['periodo'].replace('-', '.')
+                escribir_celda_segura(f'L{fila_actual + 1}', f"del {periodo_texto}")
                 
                 # S106: (mitad del computable / 12) * cantidad de meses
                 resultado_meses = (mitad_computable / 12) * reporte['meses_computables']
@@ -176,7 +183,7 @@ try:
             historial_grat = generar_y_calcular_periodos_gratificacion(fecha_ingreso_trabajador, fecha_calculo_grat)
 
             # Escribir los datos de gratificación a partir de la fila 173
-            fila_inicial_grat = 183
+            fila_inicial_grat = fila_actual + 6
             
             fila_actual_grat = fila_inicial_grat
             tramo_numero_grat = 1
