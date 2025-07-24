@@ -1,8 +1,10 @@
 import pandas as pd
 import openpyxl
+from openpyxl.styles import Font
 import os
 from datetime import date
-from calculadoras import generar_y_calcular_periodos_cts
+from calculadora_cts import generar_y_calcular_periodos_cts
+from calculadora_gratificaciones import generar_y_calcular_periodos_gratificacion
 
 proyecto_dir = os.path.join(os.path.dirname(__file__), '..')
 
@@ -40,6 +42,7 @@ try:
         f_ingreso = fila['Fec. Ing.']
         f_cese = fila['Fecha Cese']
         salario = fila['Basico']
+        gratificacion = salario/2 # Preguntar por el salario para ver si es el correcto
         computable = salario + (520 / 6)#referencial
 
         salario_antiguo = 1100
@@ -102,6 +105,8 @@ try:
                     try:
                         if not isinstance(hoja[celda_ref], openpyxl.cell.MergedCell):
                             hoja[celda_ref] = valor
+                            # Aplicar formato Arial Narrow tamaño 8
+                            hoja[celda_ref].font = Font(name="Arial Narrow", size=8)
                     except:
                         pass  # Ignorar si hay error al escribir
                 
@@ -148,9 +153,120 @@ try:
                 escribir_celda_segura(f'M{fila_actual + 5}', "INTERES LABORAL")
                 escribir_celda_segura(f'M{fila_actual + 6}', "Total CTS, Interes Laboral")
                 
-                # Avanzamos 6 filas para el siguiente período (4 filas usadas + 2 de espacio)
-                fila_actual += 6
+                # Avanzamos 9 filas para el siguiente período (4 filas usadas + 3 de textos + 2 de espacio)
+                fila_actual += 7
                 tramo_numero += 1
+
+        # --- CÁLCULO DE GRATIFICACIONES ---
+        # Verificar si la fecha de ingreso es válida
+        if pd.isna(f_ingreso):
+            print(f"  Saltando Gratificaciones para {nombre_persona}: fecha de ingreso vacía")
+        else:
+            # Convertir fecha de ingreso a objeto date
+            fecha_ingreso_trabajador = pd.to_datetime(f_ingreso, dayfirst=True).date()
+            
+            # Definir hasta qué fecha se calculará las gratificaciones
+            # Usar fecha de cese si existe, sino usar 2025.06.30 como predeterminada
+            if pd.isna(f_cese):
+                fecha_calculo_grat = date(2025, 6, 30)
+            else:
+                fecha_calculo_grat = pd.to_datetime(f_cese, dayfirst=True).date()
+
+            # Obtener el historial de períodos de gratificación
+            historial_grat = generar_y_calcular_periodos_gratificacion(fecha_ingreso_trabajador, fecha_calculo_grat)
+
+            # Escribir los datos de gratificación a partir de la fila 173
+            fila_inicial_grat = 183
+            
+            fila_actual_grat = fila_inicial_grat
+            tramo_numero_grat = 1
+            
+            # Función auxiliar para escribir en celda si no está combinada
+            def escribir_celda_segura_grat(celda_ref, valor):
+                try:
+                    if not isinstance(hoja[celda_ref], openpyxl.cell.MergedCell):
+                        hoja[celda_ref] = valor
+                        # Aplicar formato Arial Narrow tamaño 8
+                        hoja[celda_ref].font = Font(name="Arial Narrow", size=8)
+                except:
+                    pass  # Ignorar si hay error al escribir
+            
+            for periodo_grat in historial_grat:
+                # Calcular gratificación (salario/2)
+                gratificacion = salario_antiguo / 2
+                
+                # M: Período de gratificación (del XX.XX.XXXX al XX.XX.XXXX)
+                periodo_texto = periodo_grat['periodo'].replace('-', '.')
+                escribir_celda_segura_grat(f'M{fila_actual_grat}', f"del {periodo_texto}")
+                
+                # D173+: "Por Meses Completos: X mer Tramo"
+                escribir_celda_segura_grat(f'D{fila_actual_grat}', f"Por Meses Completos: {tramo_numero_grat} mer Tramo")
+                
+                # D174+: Variable gratificación / 6
+                escribir_celda_segura_grat(f'D{fila_actual_grat + 1}', f"{gratificacion} / 6")
+                
+                # H174+: resultado de gratificacion/6
+                escribir_celda_segura_grat(f'H{fila_actual_grat + 1}', gratificacion / 6)
+                
+                # J174+: meses del período actual
+                escribir_celda_segura_grat(f'J{fila_actual_grat + 1}', f"{periodo_grat['meses_computables']} meses")
+                
+                # S174+: (gratificacion/6) * meses del período actual
+                resultado_meses_grat = (gratificacion / 6) * periodo_grat['meses_computables']
+                escribir_celda_segura_grat(f'S{fila_actual_grat + 1}', resultado_meses_grat)
+                
+                # D175+: "Por Días"
+                escribir_celda_segura_grat(f'D{fila_actual_grat + 2}', "Por Días")
+                
+                # D176+: (gratificacion/6) / 30
+                escribir_celda_segura_grat(f'D{fila_actual_grat + 3}', f"{round(gratificacion/6, 1)} / 30")
+                
+                # H176+: (gratificacion/6)/30
+                escribir_celda_segura_grat(f'H{fila_actual_grat + 3}', (gratificacion / 6) / 30)
+                
+                # J176+: días del período actual
+                escribir_celda_segura_grat(f'J{fila_actual_grat + 3}', f"{periodo_grat['dias_computables']} días")
+                
+                # S176+: ((gratificacion/6)/30) * días del período actual
+                resultado_dias_grat = ((gratificacion / 6) / 30) * periodo_grat['dias_computables']
+                escribir_celda_segura_grat(f'S{fila_actual_grat + 3}', resultado_dias_grat)
+                
+                # S177+: Total del período (meses + días)
+                total_periodo_grat = resultado_meses_grat + resultado_dias_grat
+                escribir_celda_segura_grat(f'S{fila_actual_grat + 4}', total_periodo_grat)
+                
+                # Textos descriptivos en columna M para cada período
+                escribir_celda_segura_grat(f'M{fila_actual_grat + 4}', 'TOTAL GRATIFICACION')
+                
+                # D: "BONIFICACION EXTRAORDINARIA:"
+                escribir_celda_segura_grat(f'D{fila_actual_grat + 5}', 'BONIFICACION EXTRAORDINARIA:')
+                
+                # F: "Ley Nº 29351"
+                escribir_celda_segura_grat(f'F{fila_actual_grat + 6}', 'Ley Nº 29351')
+                
+                # J: "*"
+                escribir_celda_segura_grat(f'J{fila_actual_grat + 6}', '*')
+                
+                # K: "9"
+                escribir_celda_segura_grat(f'K{fila_actual_grat + 6}', '9')
+                
+                # L: "%"
+                escribir_celda_segura_grat(f'L{fila_actual_grat + 6}', '%')
+                
+                # M: "TOTAL BONIF. EXTRAORD."
+                escribir_celda_segura_grat(f'M{fila_actual_grat + 6}', 'TOTAL BONIF. EXTRAORD.')
+                
+                # M: "TOT GRATIF, MAS BONIF"
+                escribir_celda_segura_grat(f'M{fila_actual_grat + 7}', 'TOT GRATIF, MAS BONIF')
+                
+                escribir_celda_segura_grat(f'M{fila_actual_grat + 8}', 'INTERES LABORAL')
+                
+                # M: "SUMATORIA TOTAL DE GRATIF. INTERES LABORAL" (último antes de la siguiente iteración)
+                escribir_celda_segura_grat(f'M{fila_actual_grat + 9}', 'SUMATORIA TOTAL DE GRATIF. INTERES LABORAL')
+                
+                # Avanzar 12 filas para el siguiente período (4 filas usadas + 8 de textos adicionales)
+                fila_actual_grat += 11
+                tramo_numero_grat += 1
 
         nombre_archivo_salida = f"Liquidacion_{nombre_persona.replace(' ', '_')}.xlsx"
         ruta_completa_salida = os.path.join(ruta_salida, nombre_archivo_salida)
